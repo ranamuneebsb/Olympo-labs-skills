@@ -280,15 +280,24 @@ def main():
 
     website_col, company_col = detect_columns(in_headers)
     if not website_col:
-        print(f"WARNING: No website column auto-detected. Headers: {in_headers}")
-        ans = input("Type the website column name (blank to abort): ").strip()
-        if not ans:
+        if len(in_headers) == 1:
+            website_col = in_headers[0]
+            print(
+                f"NOTE: Single-column CSV; using '{website_col}' as the "
+                f"website column."
+            )
+        else:
+            print(
+                f"ERROR: No website column auto-detected. Headers: {in_headers}\n"
+                f"Rename one of your columns to include 'website', 'domain', "
+                f"'url', 'site', 'web', or 'homepage' and re-run."
+            )
             sys.exit(1)
-        website_col = ans
     if not company_col:
-        print(f"WARNING: No company column auto-detected. Headers: {in_headers}")
-        ans = input("Type the company column name (blank to skip): ").strip()
-        company_col = ans or None
+        print(
+            f"NOTE: No company column auto-detected (optional). "
+            f"Headers: {in_headers}. Continuing without it."
+        )
 
     print(f"Website column: {website_col}")
     print(f"Company column: {company_col}")
