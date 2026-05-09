@@ -8,6 +8,11 @@ in a CSV using ZenRows API. Auto-detects
 website and company name columns. No column
 mapping needed from user.
 
+SETUP (run once):
+Windows: Double-click setup.bat
+Mac/Linux: bash setup.sh
+Or manually: pip install requests
+
 USER INPUTS (only 3 required):
 - csv_path: full path to CSV including folder
 - zenrows_api_key: ZenRows API key

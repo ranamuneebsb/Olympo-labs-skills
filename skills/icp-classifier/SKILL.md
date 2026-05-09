@@ -7,6 +7,11 @@ Classifies companies in a CSV for ICP fit
 using OpenRouter AI. User provides the CSV,
 the ICP prompt, and API key. That is all.
 
+SETUP (run once):
+Windows: Double-click setup.bat
+Mac/Linux: bash setup.sh
+Or manually: pip install requests
+
 USER INPUTS (only 3 required):
 - csv_path: full path to CSV including folder
 - openrouter_api_key: OpenRouter API key
