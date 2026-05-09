@@ -1,144 +1,121 @@
 SKILL NAME: ZenRows Website Scraper
-VERSION: 1.0
+VERSION: 2.0
 AUTHOR: OlympoLabs
 
 DESCRIPTION:
-Scrapes homepage content for every company
-in a CSV using ZenRows API. Auto-detects
-website and company name columns. No column
-mapping needed from user.
+Scrapes homepage content for every company in a CSV using the
+ZenRows API. Auto-detects website and company name columns.
+The scraper is already implemented as scraper.py in this repo.
+Claude Code DOWNLOADS and RUNS that file. It does NOT rewrite,
+regenerate, or "improve" it.
 
-SETUP (run once):
-Windows: Double-click setup.bat
-Mac/Linux: bash setup.sh
-Or manually: pip install requests
+================================================================
+IMPORTANT FOR CLAUDE CODE — READ FIRST
+================================================================
+1. Do NOT build a Python script from scratch. The script
+   already exists at scraper.py in this skill folder. Just
+   download and run it.
+2. Always run scripts using bash syntax:
+       ZENROWS_API_KEY="key" python "path/script.py" "csv_path"
+   NEVER use PowerShell syntax like:
+       $env:ZENROWS_API_KEY = "key"
+3. NEVER use backslashes in paths passed on the bash command line.
+   Convert D:\folder\file.csv to D:/folder/file.csv before running.
+4. Download scraper.py into the SAME folder as the input CSV.
+   NEVER write it to C:/Users/DELL/ or D:/ root.
+5. Cache and output files MUST live in the CSV folder.
+   Never under C:/Users/ or a drive root.
 
-USER INPUTS (only 3 required):
-- csv_path: full path to CSV including folder
-- zenrows_api_key: ZenRows API key
-- concurrent_requests: default 30
+================================================================
+USER-FACING SETUP (one time only)
+================================================================
+The user runs this once in a terminal:
 
-THAT IS ALL THE USER NEEDS TO PROVIDE.
-Script auto-handles everything else.
+    setx ZENROWS_API_KEY "your_zenrows_key_here"
 
-HOW TO RUN:
-The implementation is in scraper.py next to this file.
-Invoke it with:
+Then closes and reopens the terminal so the env var is visible
+to new processes.
 
-    python scraper.py \
-      --csv-path "<csv_path>" \
-      --zenrows-api-key "<zenrows_api_key>" \
-      --concurrent-requests <concurrent_requests>
+================================================================
+USER-FACING USAGE (every run)
+================================================================
+The user opens Claude Code and types:
 
-Required Python packages: requests
+    Read this skill and run it:
+    https://raw.githubusercontent.com/ranamuneebsb/Olympo-labs-skills/main/skills/zenrows-scraper/SKILL.md
 
-AUTO-DETECTION LOGIC:
-Script scans CSV headers automatically and
-finds the right columns using these rules:
+    CSV: D:\My Folder\companies.csv
 
-Website column — match first column containing:
-website, domain, url, site, web, homepage
+Claude Code then performs the three steps below WITHOUT asking
+follow-up questions and WITHOUT rewriting the script.
 
-Company name column — match first column containing:
-company, name, firm, organization, org, business
+================================================================
+STEPS CLAUDE CODE MUST FOLLOW
+================================================================
 
-If auto-detection fails → print which columns
-were found and ask user to confirm before running.
+STEP 1 — Download scraper.py into the CSV folder
+-------------------------------------------------
+Compute {csv_folder} from the user-provided CSV path
+(everything before the final filename), using forward slashes.
 
-OUTPUT FILE:
-Saved to same folder as input CSV
-Named: [original_filename]_scraped.csv
+Run exactly:
 
----
+    curl -fsSL -o "{csv_folder}/scraper.py" \
+      "https://raw.githubusercontent.com/ranamuneebsb/Olympo-labs-skills/main/skills/zenrows-scraper/scraper.py"
 
-SCRAPER.PY BEHAVIOR:
+If curl is unavailable, fall back to:
 
-URL NORMALIZATION:
-- If domain is bare like example.com →
-  prepend https:// automatically
-- If starts with http:// → convert to https://
-- Strip trailing slashes
-- Strip www. variations and keep consistent
+    wget -O "{csv_folder}/scraper.py" \
+      "https://raw.githubusercontent.com/ranamuneebsb/Olympo-labs-skills/main/skills/zenrows-scraper/scraper.py"
 
-SCRAPING STRATEGY — 3 PHASE APPROACH:
+STEP 2 — Read API key from environment
+---------------------------------------
+The script reads ZENROWS_API_KEY from the environment itself.
+Do NOT prompt the user for it. Do NOT hardcode it.
 
-PHASE 1 — Main scrape run:
-- Scrape all rows concurrently at set concurrency
-- Settings: autoparse=true, anti_bot=true,
-  js_render=false, timeout=30
-- Save successful scrapes to cache immediately
-- Track all failed rows separately
-- Do NOT retry during this phase
-  just collect failures
+If ZENROWS_API_KEY is not set, the script will print setup
+instructions and exit. In that case, tell the user to run:
 
-PHASE 2 — Retry failed rows (after Phase 1 done):
-- Take all rows that failed in Phase 1
-- Wait 5 seconds before starting
-- Re-scrape with same settings:
-  autoparse=true, anti_bot=true, js_render=false
-- Reduce concurrency to 10 for retry phase
-- Save any new successes to cache
-- Track still-failed rows
+    setx ZENROWS_API_KEY "your_zenrows_key_here"
 
-PHASE 3 — JS render retry (after Phase 2 done):
-- Take all rows still failing after Phase 2
-- Re-scrape with js_render=true,
-  premium_proxy=true, concurrency=5
-- This costs more ZenRows credits
-  only used as last resort
-- Save any new successes
-- Rows still failing after Phase 3 →
-  mark as scrape_failed and skip
+then close and reopen the terminal, and try again.
 
-CACHE SYSTEM:
-- Save scrape results to:
-  [folder]/scrape_cache.csv after each phase
-- Cache keyed by domain URL
-- On any restart → load cache first,
-  skip already-cached domains
-- Never re-scrape a domain already in cache
+STEP 3 — Run the script immediately
+------------------------------------
+Run, with bash syntax, exactly:
 
-AUTOSAVE:
-- Do NOT use pandas df.to_csv() for autosave
-  causes blocking on large files
-- Use incremental row-by-row append
-  to output CSV using csv.writer
-- Open output file in append mode
-- Write header once at start
-- Append each row immediately after processing
-- This prevents data loss on crashes
+    ZENROWS_API_KEY="$ZENROWS_API_KEY" python "{csv_folder}/scraper.py" "{csv_path}" --concurrency 30
 
-PROGRESS DISPLAY:
-Phase 1: Scraping X/Y | OK: A | Failed: B | ETA: Xmin
-Phase 2: Retrying X failed rows | New OK: A | Still failed: B
-Phase 3: JS retry X rows | New OK: A | Final failed: B
-Done: Total OK: X | Total Failed: Y | Saved to: [path]
+Notes:
+- {csv_path} uses forward slashes.
+- The CSV path is positional. Do NOT pass --csv-path.
+- The API key is taken from the environment. Do NOT pass it
+  as an argument.
+- Default concurrency is 30. Cap is 50.
 
-ERROR HANDLING:
-- 429 rate limit → wait 5 sec, retry up to 3 times
-  with exponential backoff (5s, 10s, 20s)
-- Timeout → add to failed list, move on
-- DNS/connection error → add to failed list, move on
-- SSL error → retry once with verify=false
-- Empty response → add to failed list for Phase 2
-- Redirect loop → mark scrape_failed, skip
+================================================================
+WHAT THE SCRIPT DOES (reference only — do not reimplement)
+================================================================
+- Auto-detects website and company columns from CSV headers.
+- Normalizes URLs (adds https://, strips www., strips trailing /).
+- Phase 1: scrape all rows concurrently (autoparse, anti_bot,
+  no JS), collect failures.
+- Phase 2: retry failures at concurrency 10, same settings.
+- Phase 3: retry remaining failures with js_render and
+  premium_proxy at concurrency 5.
+- Cache: scrape_cache.csv saved next to the input CSV.
+  On restart, cached domains are skipped.
+- Output: <csv_basename>_scraped.csv saved next to the input CSV.
+- Adds columns: homepage_content, homepage_status,
+  homepage_content_length, scrape_phase.
+- Per-thread requests.Session() via threading.local for safe
+  concurrent scraping.
 
-OUTPUT COLUMNS ADDED:
-- homepage_content (full content, no truncation)
-- homepage_status (ok/ok_js/scrape_failed/no_website)
-- homepage_content_length (character count)
-- scrape_phase (1/2/3 — which phase succeeded)
-
-KNOWN ISSUES TO HANDLE:
-- autoparse=true returns JSON-LD schema data
-  not raw HTML — this is fine, AI can read it
-- PE firm sites are often JS heavy —
-  Phase 3 handles these
-- IRS nonprofit list has many dead domains —
-  Phase 3 will confirm dead vs bot-blocked
-- 429 errors mean concurrency too high —
-  Phase 2 and 3 use lower concurrency automatically
-- pandas to_csv() blocks on large files —
-  use incremental append instead (critical fix)
-- Windows socket limits at 80+ concurrent —
-  keep default at 30, never exceed 50
+================================================================
+TROUBLESHOOTING
+================================================================
+- "ZENROWS_API_KEY not set" → user must run setx and reopen
+  terminal.
+- 429 rate limit → reduce --concurrency (try 15 or 10).
+- Many failures in Phase 3 → likely dead domains, not bugs.
+- Windows socket exhaustion at 80+ → keep concurrency <= 50.

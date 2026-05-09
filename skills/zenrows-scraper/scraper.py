@@ -6,11 +6,23 @@ import argparse
 import csv
 import os
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlparse
 
 import requests
+
+
+SETUP_INSTRUCTIONS = """\
+ZENROWS_API_KEY is not set in the environment.
+
+ONE TIME SETUP:
+  1. Open a terminal and run:
+       setx ZENROWS_API_KEY "your_zenrows_key_here"
+  2. Close and reopen the terminal so the new env var is visible.
+  3. Re-run this command.
+"""
 
 
 WEBSITE_KEYS = ["website", "domain", "url", "site", "web", "homepage"]
@@ -51,8 +63,21 @@ def normalize_url(url):
     return f"{parsed.scheme}://{netloc}{path}"
 
 
-def scrape_one(api_key, url, js_render=False, premium=False, timeout=30):
-    """Returns (status, content, error_or_None)."""
+def scrape_one(url, api_key, phase_settings, session_local, timeout=30):
+    """Returns (status, content, error_or_None).
+
+    phase_settings: dict with keys js_render (bool) and premium (bool).
+    session_local: threading.local() shared by the worker pool. Each
+    thread lazily creates its own requests.Session() the first time it
+    runs, so concurrent workers do not share connection state.
+    """
+    if not hasattr(session_local, "session"):
+        session_local.session = requests.Session()
+    session = session_local.session
+
+    js_render = phase_settings.get("js_render", False)
+    premium = phase_settings.get("premium", False)
+
     params = {
         "url": url,
         "apikey": api_key,
@@ -69,7 +94,7 @@ def scrape_one(api_key, url, js_render=False, premium=False, timeout=30):
 
     for attempt in range(3):
         try:
-            r = requests.get(ZENROWS_ENDPOINT, params=params, timeout=timeout)
+            r = session.get(ZENROWS_ENDPOINT, params=params, timeout=timeout)
             if r.status_code == 429:
                 if attempt < len(backoffs):
                     time.sleep(backoffs[attempt])
@@ -85,7 +110,7 @@ def scrape_one(api_key, url, js_render=False, premium=False, timeout=30):
             if not tried_no_verify:
                 tried_no_verify = True
                 try:
-                    r = requests.get(
+                    r = session.get(
                         ZENROWS_ENDPOINT,
                         params=params,
                         timeout=timeout,
@@ -171,11 +196,13 @@ def run_phase(api_key, rows, concurrency, js_render, premium, phase, cache_path,
 
     done = ok = fail = 0
     start = time.time()
+    session_local = threading.local()
+    phase_settings = {"js_render": js_render, "premium": premium}
 
     def task(row):
         url = row["_normalized_url"]
         status, content, err = scrape_one(
-            api_key, url, js_render=js_render, premium=premium
+            url, api_key, phase_settings, session_local
         )
         return row, url, status, content, err
 
@@ -220,14 +247,18 @@ def write_success_row(row, cache_row, output_path, out_headers):
 
 def main():
     parser = argparse.ArgumentParser(description="ZenRows Website Scraper")
-    parser.add_argument("--csv-path", required=True)
-    parser.add_argument("--zenrows-api-key", required=True)
-    parser.add_argument("--concurrent-requests", type=int, default=30)
+    parser.add_argument("csv_path", help="Path to input CSV")
+    parser.add_argument("--concurrency", type=int, default=30,
+                        help="Phase 1 concurrency (1-50, default 30)")
     args = parser.parse_args()
 
+    api_key = os.environ.get("ZENROWS_API_KEY", "").strip()
+    if not api_key:
+        print(SETUP_INSTRUCTIONS)
+        sys.exit(1)
+
     csv_path = args.csv_path
-    api_key = args.zenrows_api_key
-    concurrency = min(max(1, args.concurrent_requests), 50)
+    concurrency = min(max(1, args.concurrency), 50)
 
     if not os.path.exists(csv_path):
         print(f"ERROR: CSV not found: {csv_path}")
