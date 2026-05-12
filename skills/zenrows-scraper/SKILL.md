@@ -1,13 +1,15 @@
 SKILL NAME: ZenRows Website Scraper
-VERSION: 2.0
+VERSION: 2.1
 AUTHOR: OlympoLabs
 
 DESCRIPTION:
 Scrapes homepage content for every company in a CSV using the
 ZenRows API. Auto-detects website and company name columns.
-The scraper is already implemented as scraper.py in this repo.
-Claude Code DOWNLOADS and RUNS that file. It does NOT rewrite,
-regenerate, or "improve" it.
+Runs a two-phase flow: Phase 1 (main scrape at user concurrency,
+default 30) and Phase 3 (JS render retry at concurrency 25 on
+Phase 1 failures). The scraper is already implemented as
+scraper.py in this repo. Claude Code DOWNLOADS and RUNS that
+file. It does NOT rewrite, regenerate, or "improve" it.
 
 ================================================================
 IMPORTANT FOR CLAUDE CODE — READ FIRST
@@ -98,11 +100,12 @@ WHAT THE SCRIPT DOES (reference only — do not reimplement)
 ================================================================
 - Auto-detects website and company columns from CSV headers.
 - Normalizes URLs (adds https://, strips www., strips trailing /).
-- Phase 1: scrape all rows concurrently (autoparse, anti_bot,
-  no JS), collect failures.
-- Phase 2: retry failures at concurrency 10, same settings.
-- Phase 3: retry remaining failures with js_render and
-  premium_proxy at concurrency 5.
+- Phase 1: scrape all rows concurrently at user concurrency
+  (default 30) with autoparse=true, anti_bot=true, js_render=false,
+  collect failures.
+- Phase 3: retry Phase 1 failures with js_render=true and
+  premium_proxy=true at concurrency 25. Anything still failing
+  is marked scrape_failed.
 - Cache: scrape_cache.csv saved next to the input CSV.
   On restart, cached domains are skipped.
 - Output: <csv_basename>_scraped.csv saved next to the input CSV.
@@ -110,6 +113,15 @@ WHAT THE SCRIPT DOES (reference only — do not reimplement)
   homepage_content_length, scrape_phase.
 - Per-thread requests.Session() via threading.local for safe
   concurrent scraping.
+
+================================================================
+PROGRESS DISPLAY
+================================================================
+The script prints these lines as it runs:
+
+    Phase 1: Scraping X/Y | OK: A | Failed: B | ETA: Xmin
+    Phase 3: JS retry X rows | New OK: A | Final failed: B
+    Done: Total OK: X | Total Failed: Y | Saved to: [path]
 
 ================================================================
 TROUBLESHOOTING

@@ -1,5 +1,7 @@
 """
-ZenRows Website Scraper - 3-phase scraping with auto-retry.
+ZenRows Website Scraper - 2-phase scraping with auto-retry.
+Phase 1 runs at user concurrency (default 30); Phase 3 retries
+Phase 1 failures with JS render at concurrency 25.
 See SKILL.md for the full spec.
 """
 import argparse
@@ -176,11 +178,6 @@ def progress_line(phase, done, total, ok, fail, start):
             f"\rPhase 1: Scraping {done}/{total} | "
             f"OK: {ok} | Failed: {fail} | ETA: {eta}"
         )
-    if phase == 2:
-        return (
-            f"\rPhase 2: Retrying {done}/{total} failed rows | "
-            f"New OK: {ok} | Still failed: {fail}"
-        )
     return (
         f"\rPhase 3: JS retry {done}/{total} rows | "
         f"New OK: {ok} | Final failed: {fail}"
@@ -346,28 +343,14 @@ def main():
     for row, cache_row in successes_1:
         write_success_row(row, cache_row, output_path, out_headers)
 
-    # PHASE 2
-    failures_2 = []
-    successes_2 = []
-    if failures_1:
-        time.sleep(5)
-        successes_2, failures_2 = run_phase(
-            api_key, failures_1,
-            concurrency=10,
-            js_render=False, premium=False, phase=2,
-            cache_path=cache_path, cache=cache,
-        )
-        for row, cache_row in successes_2:
-            write_success_row(row, cache_row, output_path, out_headers)
-
     # PHASE 3
     failures_3 = []
     successes_3 = []
-    if failures_2:
+    if failures_1:
         time.sleep(5)
         successes_3, failures_3 = run_phase(
-            api_key, failures_2,
-            concurrency=5,
+            api_key, failures_1,
+            concurrency=25,
             js_render=True, premium=True, phase=3,
             cache_path=cache_path, cache=cache,
         )
@@ -386,7 +369,6 @@ def main():
     total_ok = (
         len(cached_rows)
         + len(successes_1)
-        + len(successes_2)
         + len(successes_3)
     )
     total_failed = len(failures_3)
